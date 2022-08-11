@@ -124,6 +124,30 @@ export class TextractPipelineStack extends cdk.Stack {
       })
     );
 
+    //
+
+    const affindaParser = new lambda.Function(this, 'AffindaParser', {
+      runtime: lambda.Runtime.PYTHON_3_7,
+      code: lambda.Code.asset('code/affinda_parser'),
+      handler: 'affinda_parser.lambda_handler',
+      timeout: cdk.Duration.seconds(30),
+      environment: {
+        METADATA_SNS_TOPIC_ARN : props.metadataTopic.topicArn
+      }
+    });
+
+    affindaParser.addLayers(pipelineLayer)
+    //Trigger
+    affindaParser.addEventSource(new DynamoEventSource(props.documentRegistryTable, {
+      startingPosition: lambda.StartingPosition.TRIM_HORIZON
+    }));
+    affindaParser.addToRolePolicy(
+        new iam.PolicyStatement({
+          actions: ["s3:*"],
+          resources: ["*"]
+        })
+    );
+
     //------------------------------------------------------------
 
     // Document processor (Router to Sync/Async Pipeline)

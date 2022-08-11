@@ -125,6 +125,16 @@ class S3Helper:
         return s3Url
 
     @staticmethod
+    def downloadFile(bucketName, objectName, path):
+        s3 = AwsHelper().getClient('s3')
+        s3.download_file(bucketName, objectName, path)
+
+    @staticmethod
+    def getS3Object(bucketName, key):
+        s3 = AwsHelper().getClient('s3', awsRegion)
+        return s3.get_object(Bucket=bucketName, Key=key)
+
+    @staticmethod
     def tagS3(bucketName, s3FileName, tags=None, awsRegion=None):
         tagset = []
         for key, value in tags.items():
