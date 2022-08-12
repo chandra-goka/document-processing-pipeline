@@ -133,18 +133,27 @@ export class TextractPipelineStack extends cdk.Stack {
         AFFINDA_TOKEN : 'd6d22208c807d204549c7c4b6a13c4b210d04ebf',
         ALGOLIA_APP_ID : '82K7B9BPM6',
         ALGOLIA_API_KEY : 'eecb07fa32bf7cdf0533dd74c8d4a108',
-        ALGOLIA_INDEX_NAME : 'test_index'
+        ALGOLIA_INDEX_NAME : 'test_index',
+        DOCUMENT_REGISTRY_TABLE: props.documentRegistryTable.tableName
       }
     });
 
     affindaParser.addLayers(pipelineLayer)
     //Trigger
-    affindaParser.addEventSource(new DynamoEventSource(props.documentRegistryTable, {
-      startingPosition: lambda.StartingPosition.TRIM_HORIZON
+    affindaParser.addEventSource(new S3EventSource(comprehendResultsBucket, {
+      events: [
+        s3.EventType.OBJECT_CREATED,
+      ]
     }));
     affindaParser.addToRolePolicy(
         new iam.PolicyStatement({
           actions: ["s3:*"],
+          resources: ["*"]
+        })
+    );
+    affindaParser.addToRolePolicy(
+        new iam.PolicyStatement({
+          actions: ["dynamodb:*"],
           resources: ["*"]
         })
     );
