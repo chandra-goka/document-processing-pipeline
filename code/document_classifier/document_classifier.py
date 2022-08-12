@@ -4,7 +4,6 @@ import uuid
 import urllib.parse
 from metadata import PipelineOperationsClient
 from helper import FileHelper, S3Helper, DynamoDBHelper
-from affinda import AffindaAPI, TokenCredential
 
 PIPELINE_STAGE = "DOCUMENT_CLASSIFIER"
 
@@ -20,11 +19,6 @@ documentTypes  = os.environ.get('documentClassTypes', {
 })
 
 print(documentTypes)
-
-token              = os.environ.get('AFFINDA_TOKEN', "d6d22208c807d204549c7c4b6a13c4b210d04ebf")
-credential         = TokenCredential(token=token)
-credential = TokenCredential(token=token)
-client = AffindaAPI(credential=credential)
 
 if not metadataTopic:
     raise ValueError("Missing arguments.")
@@ -76,17 +70,6 @@ def startNLPProcessing(bucketName, objectName, documentId):
         'message': output
     }
 
-def upload_to_affinda(newImage):
-    print("in uploadToAffinda >>")
-    bucketName = newImage.get("bucketName")
-    objectName = newImage.get("documentName")
-    # Create resume with file
-    S3Helper().downloadFile(bucketName, objectName, f'/tmp/{objectName}')
-    file_pth = Path(f'/tmp/{objectName}')
-    with open(file_pth, "rb") as f:
-        resume = client.create_resume(file=f)
-        print(resume.as_dict())
-
 def lambda_handler(event, context):
 
     print("event: {}".format(event))
@@ -103,4 +86,3 @@ def lambda_handler(event, context):
                     print("Record not an INSERT or MODIFY event in DynamoDB")
             except Exception as e:
                 print("Failed to process record. Exception: {}".format(e))
-    upload_to_affinda(invokedItem)

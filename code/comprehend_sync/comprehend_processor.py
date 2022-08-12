@@ -5,14 +5,12 @@ from pathlib import Path
 import boto3
 from trp import Document
 from helper import S3Helper, AwsHelper, FileHelper
-from es import ESCluster
 import requests
 from pprint import pprint
 from og import OutputGenerator
 from aws_requests_auth.aws_auth import AWSRequestsAuth
 from requests_aws4auth import AWS4Auth
 from metadata import PipelineOperationsClient, DocumentLineageClient
-from affinda import AffindaAPI, TokenCredential
 
 PIPELINE_STAGE = "SYNC_PROCESS_COMPREHEND"
 
@@ -20,18 +18,9 @@ COMPREHEND_CHARACTER_LIMIT = 4096
 
 metadataTopic      = os.environ.get('METADATA_SNS_TOPIC_ARN', None)
 comprehendBucket   = os.environ.get('TARGET_COMPREHEND_BUCKET', None)
-esCluster          = os.environ.get('TARGET_ES_CLUSTER', None)
-esIndex            = os.environ.get('ES_CLUSTER_INDEX', "document")
-token              = os.environ.get('AFFINDA_TOKEN', "token")
-credential         = TokenCredential(token=token)
-affinda_url        = "https://api.affinda.com/v2"
-
-if not esCluster or not comprehendBucket or not metadataTopic:
-    raise Exception("Missing arguments.")
 
 pipeline_client = PipelineOperationsClient(metadataTopic)
 lineage_client  = DocumentLineageClient(metadataTopic)
-es              = ESCluster(host=esCluster)
 
 def dissectObjectName(objectName):
     objectParts = objectName.split("/ocr-analysis/")
@@ -109,7 +98,7 @@ def runComprehend(bucketName, objectName, callerId):
     documentId, documentName = dissectObjectName(objectName)
     assert (documentId == S3Helper().getTagsS3(bucketName, objectName).get('documentId', None)), "File path {} does not match the expected documentId tag of the object triggered.".format(objectName)
     
-    textractOutputJson = json.loads(S3Helper().(bucketName, objectName))
+    textractOutputJson = json.loads(S3Helper().readFromS3(bucketName, objectName))
     og = OutputGenerator(response=textractOutputJson, forms=False, tables=False)
     
     pipeline_client.body = {
@@ -125,9 +114,8 @@ def runComprehend(bucketName, objectName, callerId):
     comprehendFileName = originalFileName + "/comprehend-output.json"
     comprehendFileS3Url = "https://{}.s3.amazonaws.com/{}".format(comprehendBucket, urllib.parse.quote_plus(comprehendFileName, safe="/"))
     tagging = "documentId={}".format(documentId)
-    
-    es.connect()
-    esPayload = []
+
+    afPayload = []
     page_num = 1
     for page in document.pages:
         table = og.structurePageTable(page)
@@ -153,25 +141,16 @@ def runComprehend(bucketName, objectName, callerId):
         else:
             keyPhrases, entitiesDetected = singularSendToComprehend(comprehend, text, 'en')
 
-        esPageLoad = compileESPayload(es, page_num, keyPhrases, entitiesDetected, text, table, forms, documentId)
-        esPayload.append(esPageLoad)
+        afPageLoad = compileAffindaPayload(page_num, keyPhrases, entitiesDetected, text, table, forms, documentId)
+        afPayload.append(afPageLoad)
         page_num = page_num + 1
 
     try:
-        es.post_bulk(index=esIndex, payload=esPayload)
-    except Exception as e:
-        pipeline_client.stageFailed("Could not post to Elasticsearch")
-        raise(e)
-
-    print("Data uploaded to ES")
-    try:
-        S3Helper().writeToS3(json.dumps(esPayload), comprehendBucket, comprehendFileName, taggingStr=tagging)
+        S3Helper().writeToS3(json.dumps(afPayload), comprehendBucket, comprehendFileName, taggingStr=tagging)
     except Exception as e:
         pipeline_client.stageFailed("Failed to write comprehend payload to S3")
         raise(e)
 
-    uploadToAffinda()
-        
     lineage_client.recordLineage({
         "documentId":       documentId,
         "callerId":         callerId,
@@ -183,7 +162,7 @@ def runComprehend(bucketName, objectName, callerId):
     pipeline_client.stageSucceeded()
     print("Comprehend data uploaded to S3 at {}".format(comprehendFileName))
 
-def compileESPayload(esCluster, pageNum, keyPhrases, entitiesDetected, text, table, forms, documentId):
+def compileAffindaPayload(pageNum, keyPhrases, entitiesDetected, text, table, forms, documentId):
     payload = {
         'documentId': documentId,
         'page'      : pageNum,

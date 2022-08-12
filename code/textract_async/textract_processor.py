@@ -28,7 +28,7 @@ def getJobResults(api, jobId, objectName):
     )
     # skip the s3 access file, which will always appear first
     for textractResultFile in textractRawResultsFiles[1:]:
-        resultJSON.append(json.loads(s3_helper.(textractBucketName, textractResultFile)))
+        resultJSON.append(json.loads(s3_helper.readFromS3(textractBucketName, textractResultFile)))
     
     # time.sleep(5)
 

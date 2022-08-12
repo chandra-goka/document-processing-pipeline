@@ -1,13 +1,12 @@
 import * as cdk from '@aws-cdk/core';
 import iam = require('@aws-cdk/aws-iam');
-import { S3EventSource, SqsEventSource, SnsEventSource, DynamoEventSource } from '@aws-cdk/aws-lambda-event-sources';
+import { S3EventSource, SqsEventSource, DynamoEventSource } from '@aws-cdk/aws-lambda-event-sources';
 import sns = require('@aws-cdk/aws-sns');
 import snsSubscriptions = require("@aws-cdk/aws-sns-subscriptions");
 import sqs = require('@aws-cdk/aws-sqs');
 import dynamodb = require('@aws-cdk/aws-dynamodb');
 import lambda = require('@aws-cdk/aws-lambda');
 import s3 = require('@aws-cdk/aws-s3');
-import es = require('@aws-cdk/aws-elasticsearch');
 
 interface MultistackProps extends cdk.StackProps {
   pipelineOpsTable : dynamodb.Table;
@@ -18,7 +17,6 @@ interface MultistackProps extends cdk.StackProps {
   pipelineOpsSQS : sqs.IQueue;
   documentRegistrySQS : sqs.IQueue;
   metadataTopic : sns.ITopic;
-  esDomain: es.IDomain;
 }
 
 export class TextractPipelineStack extends cdk.Stack {
@@ -33,11 +31,11 @@ export class TextractPipelineStack extends cdk.Stack {
       assumedBy: new iam.ServicePrincipal('textract.amazonaws.com')
     });
     textractServiceRole.addToPolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        resources: [textractJobCompletionTopic.topicArn],
-        actions: ["sns:Publish"]
-      })
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          resources: [textractJobCompletionTopic.topicArn],
+          actions: ["sns:Publish"]
+        })
     );
 
 
@@ -61,9 +59,9 @@ export class TextractPipelineStack extends cdk.Stack {
     //Trigger
 
     textractJobCompletionTopic.addSubscription(
-      new snsSubscriptions.SqsSubscription(jobResultsQueue)
+        new snsSubscriptions.SqsSubscription(jobResultsQueue)
     );
-  
+
     const pipelineLayer = new lambda.LayerVersion(this, 'PipelineFunctionsLayer', {
       code: lambda.Code.fromAsset('code/lambda_layer/pipeline'),
       compatibleRuntimes: [lambda.Runtime.PYTHON_3_7],
@@ -93,12 +91,12 @@ export class TextractPipelineStack extends cdk.Stack {
 
     //Permissions
     rawContentsBucket.grantReadWrite(documentRegistrar)
-    
+
     documentRegistrar.addToRolePolicy(
-      new iam.PolicyStatement({
-        actions: ["sns:publish"],
-        resources: ["*"]
-      })
+        new iam.PolicyStatement({
+          actions: ["sns:publish"],
+          resources: ["*"]
+        })
     );
 
     const documentClassifier = new lambda.Function(this, 'DocumentClassifier', {
@@ -110,18 +108,18 @@ export class TextractPipelineStack extends cdk.Stack {
         METADATA_SNS_TOPIC_ARN : props.metadataTopic.topicArn
       }
     });
-    
+
     documentClassifier.addLayers(pipelineLayer)
     //Trigger
     documentClassifier.addEventSource(new DynamoEventSource(props.documentRegistryTable, {
       startingPosition: lambda.StartingPosition.TRIM_HORIZON
     }));
-    
+
     documentClassifier.addToRolePolicy(
-      new iam.PolicyStatement({
-        actions: ["sns:publish"],
-        resources: ["*"]
-      })
+        new iam.PolicyStatement({
+          actions: ["sns:publish"],
+          resources: ["*"]
+        })
     );
 
     //
@@ -133,9 +131,9 @@ export class TextractPipelineStack extends cdk.Stack {
       timeout: cdk.Duration.seconds(30),
       environment: {
         AFFINDA_TOKEN : 'd6d22208c807d204549c7c4b6a13c4b210d04ebf',
-        ALGOLIA_APP_ID : '14BBPQSPBF',
-        ALGOLIA_API_KEY : '870430b52db0d6c1225256a218be4eb2',
-        ALGOLIA_INDEX_NAME : 'sample_otp'
+        ALGOLIA_APP_ID : '82K7B9BPM6',
+        ALGOLIA_API_KEY : 'eecb07fa32bf7cdf0533dd74c8d4a108',
+        ALGOLIA_INDEX_NAME : 'test_index'
       }
     });
 
@@ -177,12 +175,12 @@ export class TextractPipelineStack extends cdk.Stack {
     rawContentsBucket.grantReadWrite(extensionDetector)
     asyncdocBucket.grantReadWrite(extensionDetector)
     syncdocBucket.grantReadWrite(extensionDetector)
-    
+
     extensionDetector.addToRolePolicy(
-      new iam.PolicyStatement({
-        actions: ["sns:publish"],
-        resources: ["*"]
-      })
+        new iam.PolicyStatement({
+          actions: ["sns:publish"],
+          resources: ["*"]
+        })
     );
 
     //------------------------------------------------------------
@@ -209,16 +207,16 @@ export class TextractPipelineStack extends cdk.Stack {
     syncdocBucket.grantReadWrite(textractSyncProcessor)
     textractResultsBucket.grantReadWrite(textractSyncProcessor)
     textractSyncProcessor.addToRolePolicy(
-      new iam.PolicyStatement({
-        actions: ["textract:*"],
-        resources: ["*"]
-      })
+        new iam.PolicyStatement({
+          actions: ["textract:*"],
+          resources: ["*"]
+        })
     );
     textractSyncProcessor.addToRolePolicy(
-      new iam.PolicyStatement({
-        actions: ["sns:publish"],
-        resources: ["*"]
-      })
+        new iam.PolicyStatement({
+          actions: ["sns:publish"],
+          resources: ["*"]
+        })
     );
     //------------------------------------------------------------
 
@@ -246,22 +244,22 @@ export class TextractPipelineStack extends cdk.Stack {
     asyncdocBucket.grantRead(textractAsyncStarter)
     textractResultsBucket.grantReadWrite(textractAsyncStarter)
     textractAsyncStarter.addToRolePolicy(
-      new iam.PolicyStatement({
-        actions: ["iam:PassRole"],
-        resources: [textractServiceRole.roleArn]
-      })
+        new iam.PolicyStatement({
+          actions: ["iam:PassRole"],
+          resources: [textractServiceRole.roleArn]
+        })
     );
     textractAsyncStarter.addToRolePolicy(
-      new iam.PolicyStatement({
-        actions: ["textract:*"],
-        resources: ["*"]
-      })
+        new iam.PolicyStatement({
+          actions: ["textract:*"],
+          resources: ["*"]
+        })
     );
     textractAsyncStarter.addToRolePolicy(
-      new iam.PolicyStatement({
-        actions: ["sns:publish"],
-        resources: ["*"]
-      })
+        new iam.PolicyStatement({
+          actions: ["sns:publish"],
+          resources: ["*"]
+        })
     );
     //------------------------------------------------------------
 
@@ -288,16 +286,16 @@ export class TextractPipelineStack extends cdk.Stack {
     textractResultsBucket.grantReadWrite(textractAsyncProcessor)
     jobResultsQueue.grantConsumeMessages(textractAsyncProcessor)
     textractAsyncProcessor.addToRolePolicy(
-      new iam.PolicyStatement({
-        actions: ["textract:*"],
-        resources: ["*"]
-      })
+        new iam.PolicyStatement({
+          actions: ["textract:*"],
+          resources: ["*"]
+        })
     );
     textractAsyncProcessor.addToRolePolicy(
-      new iam.PolicyStatement({
-        actions: ["sns:publish"],
-        resources: ["*"]
-      })
+        new iam.PolicyStatement({
+          actions: ["sns:publish"],
+          resources: ["*"]
+        })
     );
 
     //--------------
@@ -310,7 +308,6 @@ export class TextractPipelineStack extends cdk.Stack {
       memorySize: 10000,
       timeout: cdk.Duration.seconds(900),
       environment: {
-        TARGET_ES_CLUSTER: props.esDomain.domainEndpoint,
         TARGET_COMPREHEND_BUCKET: comprehendResultsBucket.bucketName,
         METADATA_SNS_TOPIC_ARN : props.metadataTopic.topicArn
       }
@@ -326,22 +323,22 @@ export class TextractPipelineStack extends cdk.Stack {
     textractResultsBucket.grantReadWrite(comprehendSyncProcessor)
     comprehendResultsBucket.grantReadWrite(comprehendSyncProcessor)
     comprehendSyncProcessor.addToRolePolicy(
-      new iam.PolicyStatement({
-        actions: ["es:*"],
-        resources: ["*"]
-      })
+        new iam.PolicyStatement({
+          actions: ["es:*"],
+          resources: ["*"]
+        })
     );
     comprehendSyncProcessor.addToRolePolicy(
-      new iam.PolicyStatement({
-        actions: ["comprehend:*"],
-        resources: ["*"]
-      })
+        new iam.PolicyStatement({
+          actions: ["comprehend:*"],
+          resources: ["*"]
+        })
     );
     comprehendSyncProcessor.addToRolePolicy(
-      new iam.PolicyStatement({
-        actions: ["sns:publish"],
-        resources: ["*"]
-      })
+        new iam.PolicyStatement({
+          actions: ["sns:publish"],
+          resources: ["*"]
+        })
     );
   }
 }
