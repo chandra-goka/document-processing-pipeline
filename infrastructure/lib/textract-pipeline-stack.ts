@@ -132,7 +132,10 @@ export class TextractPipelineStack extends cdk.Stack {
       handler: 'affinda_parser.lambda_handler',
       timeout: cdk.Duration.seconds(30),
       environment: {
-        METADATA_SNS_TOPIC_ARN : props.metadataTopic.topicArn
+        AFFINDA_TOKEN : 'd6d22208c807d204549c7c4b6a13c4b210d04ebf',
+        ALGOLIA_APP_ID : '14BBPQSPBF',
+        ALGOLIA_API_KEY : '870430b52db0d6c1225256a218be4eb2',
+        ALGOLIA_INDEX_NAME : 'sample_otp'
       }
     });
 
@@ -147,6 +150,7 @@ export class TextractPipelineStack extends cdk.Stack {
           resources: ["*"]
         })
     );
+
 
     //------------------------------------------------------------
 
