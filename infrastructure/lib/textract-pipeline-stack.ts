@@ -128,8 +128,9 @@ export class TextractPipelineStack extends cdk.Stack {
       runtime: lambda.Runtime.PYTHON_3_7,
       code: lambda.Code.asset('code/affinda_parser'),
       handler: 'affinda_parser.lambda_handler',
-      timeout: cdk.Duration.seconds(30),
+      timeout: cdk.Duration.seconds(300),
       environment: {
+        HUMANTIC_AI_KEY : 'chrexec_1cbdd234c31f2de3c66f149553149a45',
         AFFINDA_TOKEN : 'd6d22208c807d204549c7c4b6a13c4b210d04ebf',
         ALGOLIA_APP_ID : '82K7B9BPM6',
         ALGOLIA_API_KEY : 'eecb07fa32bf7cdf0533dd74c8d4a108',
