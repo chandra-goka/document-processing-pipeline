@@ -70,6 +70,8 @@ def create_humantic_user_profile(file_pth, file_name):
     BASE_URL = "https://api.humantic.ai/v1/user-profile/create"  # Base URL for the CREATE endpoint
     headers = {}
     USER_ID = f"test{str(randrange(100, 100000))}"
+    # Analysis ID: required; User profile link from LinkedIn or, User Email ID
+    # or, for document or text, use any unique identifier. We suggest using a value that helps you identify the analysis easily.
     USER_ID = "test12345678"  # or, any unique identifier
 
     url = f"{BASE_URL}?apikey={HUMANTIC_AI_KEY}&userid={USER_ID}"
@@ -77,8 +79,10 @@ def create_humantic_user_profile(file_pth, file_name):
     # if not the case of text based input
     payload = {}
 
+    # Document: required; only PDF and DOCX format of document files are supported.
+    # key name must be "document" and value must be a file
     files = [
-      ("document", (file_name, open(file_pth, "rb"), "application/octet-stream"))
+      ("document", (os.path.basename(file_pth), open(file_pth, "rb"), "application/octet-stream"))
     ]
 
     response = requests.request("POST", url, data=payload, headers=headers, files=files)
@@ -112,7 +116,6 @@ def fetch_humantic_user_profile(user_id):
 
 
 def get_humantic_data(bucket_name, document_name, file_name):
-    print("humantic ai..")
     file_pth = get_tmp_file_path(bucket_name, document_name)
     user_id = create_humantic_user_profile(file_pth, file_name)
     print(f"humantic user_id : {user_id}")
