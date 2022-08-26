@@ -7,6 +7,7 @@ import sqs = require('@aws-cdk/aws-sqs');
 import dynamodb = require('@aws-cdk/aws-dynamodb');
 import lambda = require('@aws-cdk/aws-lambda');
 import s3 = require('@aws-cdk/aws-s3');
+import s3n = require('@aws-cdk/aws-s3-notifications')
 
 interface MultistackProps extends cdk.StackProps {
   pipelineOpsTable : dynamodb.Table;
@@ -41,8 +42,9 @@ export class TextractPipelineStack extends cdk.Stack {
 
     //**********S3 Bucket******************************
     //S3 bucket for input documents and output
-    const rawContentsBucket = new s3.Bucket(this, 'RawDocumentsBucket', { versioned: false, removalPolicy: cdk.RemovalPolicy.DESTROY});
-
+    const rawContentsBucket = s3.Bucket.fromBucketAttributes(this, 'replace-bucket-name-here', {
+          bucketArn: 'replace-bucket-arn-here',
+      });
     const asyncdocBucket = new s3.Bucket(this, 'LargeDocumentsBucket', { versioned: false, removalPolicy: cdk.RemovalPolicy.DESTROY});
 
     const syncdocBucket = new s3.Bucket(this, 'ImageDocumentsBucket', { versioned: false, removalPolicy: cdk.RemovalPolicy.DESTROY});
@@ -81,23 +83,23 @@ export class TextractPipelineStack extends cdk.Stack {
     });
     //Layer
     documentRegistrar.addLayers(pipelineLayer)
-    //Trigger
-    documentRegistrar.addEventSource(new S3EventSource(rawContentsBucket, {
-      events: [
-        s3.EventType.OBJECT_CREATED,
-        s3.EventType.OBJECT_REMOVED_DELETE
-      ]
-    }));
+
 
     //Permissions
-    rawContentsBucket.grantReadWrite(documentRegistrar)
+      rawContentsBucket.addEventNotification(s3.EventType.OBJECT_CREATED, new s3n.LambdaDestination(documentRegistrar));
 
-    documentRegistrar.addToRolePolicy(
+      documentRegistrar.addToRolePolicy(
         new iam.PolicyStatement({
           actions: ["sns:publish"],
           resources: ["*"]
         })
     );
+    documentRegistrar.addToRolePolicy(
+          new iam.PolicyStatement({
+              actions: ["s3:*"],
+              resources: ["*"]
+          })
+      );
 
     const documentClassifier = new lambda.Function(this, 'DocumentClassifier', {
       runtime: lambda.Runtime.PYTHON_3_7,
@@ -182,7 +184,6 @@ export class TextractPipelineStack extends cdk.Stack {
     }));
 
     //Permissions`
-    rawContentsBucket.grantReadWrite(extensionDetector)
     asyncdocBucket.grantReadWrite(extensionDetector)
     syncdocBucket.grantReadWrite(extensionDetector)
 
@@ -192,6 +193,14 @@ export class TextractPipelineStack extends cdk.Stack {
           resources: ["*"]
         })
     );
+
+    extensionDetector.addToRolePolicy(
+          new iam.PolicyStatement({
+              actions: ["s3:*"],
+              resources: ["*"]
+          })
+      );
+
 
     //------------------------------------------------------------
 
